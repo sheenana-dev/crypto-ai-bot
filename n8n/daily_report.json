@@ -1,0 +1,32 @@
+{
+  "name": "Crypto Bot - Daily Report (8 AM)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 8 * * *" }]
+        }
+      },
+      "name": "Every Day 8 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:5001/report",
+        "method": "GET",
+        "options": { "timeout": 15000 }
+      },
+      "name": "Send Daily Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 300]
+    }
+  ],
+  "connections": {
+    "Every Day 8 AM": { "main": [[{ "node": "Send Daily Report", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "crypto-bot" }]
+}
