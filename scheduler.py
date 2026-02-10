@@ -27,12 +27,10 @@ from agents.risk_manager import RiskManager
 from agents.executor import ExecutionAgent
 from agents.portfolio import PortfolioTracker
 from agents.pair_analyzer import PairAnalyzer
-from agents.optimizer import OptimizerAgent
 from agents.notifier import (
     send_telegram, format_cycle_report, format_daily_report,
     notify_kill_switch, notify_error,
 )
-from agents.telegram_handler import TelegramCommandHandler
 from config.grid_config import GRID_PARAMS
 from database.db import init_db, get_connection
 
@@ -283,12 +281,7 @@ def send_daily_report():
         # Send portfolio report
         send_telegram(format_daily_report(portfolio_data))
 
-        # Add daily optimization insights
-        optimizer = OptimizerAgent()
-        daily_optimization = optimizer.generate_daily_report()
-        send_telegram(daily_optimization)
-
-        logger.info("Daily report + optimization insights sent")
+        logger.info("Daily report sent")
 
     except Exception as e:
         logger.error(f"Daily report error: {e}")
@@ -337,35 +330,13 @@ def analyze_and_update_pairs():
         send_telegram(f"⚠️ Pair analysis failed: {str(e)}")
 
 
-def send_weekly_optimization_report():
-    """Generate and send weekly performance review with optimization recommendations."""
-    try:
-        logger.info("Generating weekly optimization report...")
-        optimizer = OptimizerAgent()
-
-        # Generate comprehensive report
-        report = optimizer.generate_weekly_report()
-
-        # Send to Telegram
-        send_telegram(report)
-        logger.info("Weekly optimization report sent")
-
-    except Exception as e:
-        logger.error(f"Weekly optimization report error: {e}")
-        send_telegram(f"⚠️ Weekly report failed: {str(e)}")
-
-
 def main():
     init_db()
     logger.info(f"Starting trading bot (testnet={settings.TESTNET})")
     logger.info(f"Pairs: {settings.PAIRS}")
-    logger.info("Schedule: trading cycle every 3 min, daily report at 10:00 AM PHT, pair analysis every 6 hours, weekly optimization Sundays 10:30 AM PHT")
+    logger.info("Schedule: trading cycle every 3 min, daily report at 10:00 AM PHT, pair analysis every 6 hours")
 
     send_telegram("🤖 *Trading bot started*\n\nTestnet: " + str(settings.TESTNET))
-
-    # Start Telegram command listener (background thread)
-    cmd_handler = TelegramCommandHandler(create_exchange)
-    cmd_handler.start()
 
     # Run one cycle immediately
     run_trading_cycle()
@@ -375,12 +346,10 @@ def main():
     scheduler.add_job(run_trading_cycle, "interval", minutes=3, id="trading_cycle")
     scheduler.add_job(send_daily_report, "cron", hour=10, minute=0, id="daily_report")
     scheduler.add_job(analyze_and_update_pairs, "interval", hours=6, id="pair_analysis")
-    scheduler.add_job(send_weekly_optimization_report, "cron", day_of_week="sun", hour=10, minute=30, id="weekly_optimization")
 
     # Graceful shutdown on Ctrl+C
     def shutdown(signum, frame):
         logger.info("Shutting down...")
-        cmd_handler.stop()
         send_telegram("🛑 *Trading bot stopped*")
         scheduler.shutdown(wait=False)
         sys.exit(0)

@@ -76,8 +76,26 @@ class StrategyAgent:
         else:
             num_grids = base_num_grids  # Full 10 levels in ranging markets
 
-        spacing_pct = params["grid_spacing_pct"]
+        base_spacing_pct = params["grid_spacing_pct"]
         order_size_usdt = params["order_size_usdt"]
+
+        # ADAPTIVE SPACING: Adjust grid spacing based on market regime and trend strength
+        adx = market_state.indicators.adx
+        if regime == MarketRegime.RANGING:
+            if adx < 23:
+                # Weak/choppy market — widen grids for more fills
+                spacing_multiplier = 1.5
+            else:
+                # Normal ranging market (ADX 23-25)
+                spacing_multiplier = 1.0
+        elif regime in [MarketRegime.TRENDING_UP, MarketRegime.TRENDING_DOWN]:
+            # Trending market — widen grids for safety (less exposure risk)
+            spacing_multiplier = 1.2
+        else:
+            # Default
+            spacing_multiplier = 1.0
+
+        spacing_pct = base_spacing_pct * spacing_multiplier
 
         # Check current position on exchange to determine bias
         position_bias = self._get_position_bias(pair)
@@ -132,6 +150,13 @@ class StrategyAgent:
         sell_prices = [s.price for s in signals if s.side == OrderSide.SELL]
         buy_range = f"${min(buy_prices):.4f}-${max(buy_prices):.4f}" if buy_prices else "none"
         sell_range = f"${min(sell_prices):.4f}-${max(sell_prices):.4f}" if sell_prices else "none"
+
+        # Log adaptive spacing adjustment if applied
+        if spacing_multiplier != 1.0:
+            logger.info(
+                f"{pair} ADAPTIVE SPACING: {base_spacing_pct*100:.1f}% → {spacing_pct*100:.1f}% "
+                f"(×{spacing_multiplier:.1f} due to {regime.value}, ADX={adx:.1f})"
+            )
 
         logger.info(
             f"{pair} grid: {num_buys} buy, {num_sells} sell, "
