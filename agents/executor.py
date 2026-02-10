@@ -43,6 +43,12 @@ class ExecutionAgent:
 
     def _place_order(self, signal: OrderSignal) -> Optional[TradeLog]:
         """Place a single order with retry logic. Uses market for DCA, limit for grid."""
+        # Binance Futures minimum notional is $100
+        notional = signal.price * signal.amount
+        if notional < 100:
+            logger.warning(f"Skipping {signal.pair} order: notional ${notional:.2f} < $100 minimum")
+            return None
+
         self._ensure_leverage(signal.pair)
 
         # Use market orders for DCA (fills instantly on testnet)
@@ -64,6 +70,7 @@ class ExecutionAgent:
                         side=signal.side.value.lower(),
                         amount=signal.amount,
                         price=signal.price,
+                        params={"timeInForce": "GTX"},  # Post-only: maker fees only (0.02% vs 0.05% taker)
                     )
 
                 fill_price = float(order.get("average", 0) or order.get("price", 0) or signal.price)
@@ -83,8 +90,8 @@ class ExecutionAgent:
 
                 order_type = "MARKET" if use_market else "LIMIT"
                 logger.info(
-                    f"Order placed: {order_type} {signal.side.value} {signal.amount:.8f} {signal.pair} "
-                    f"@ {fill_price:.2f} → id={trade.order_id}"
+                    f"Order placed: {order_type} {signal.side.value} {signal.amount} {signal.pair} "
+                    f"@ {fill_price} → id={trade.order_id}"
                 )
                 return trade
 

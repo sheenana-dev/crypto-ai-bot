@@ -6,26 +6,27 @@ load_dotenv()
 # --- Exchange ---
 BINANCE_API_KEY = os.getenv("BINANCE_API_KEY", "")
 BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET", "")
-TESTNET = True  # Set False for live trading
+TESTNET = False  # Set False for live trading
 
 # --- Trading Pairs (USDT-margined futures use :USDT suffix) ---
-PAIRS = ["BTC/USDT:USDT"]
+PAIRS = ["BTC/USDT:USDT", "ETH/USDT:USDT", "SOL/USDT:USDT", "XRP/USDT:USDT"]  # DOGE removed (10% WR dead weight)
 
 # --- Leverage ---
 LEVERAGE = 10
 
 # --- Capital Allocation (USDT) ---
 TOTAL_CAPITAL = 1000
-GRID_CAPITAL = 600
-DCA_RESERVE = 250
-EMERGENCY_BUFFER = 100
-FEE_BUFFER = 50
+GRID_CAPITAL = 600        # 60% for grid trading
+DCA_RESERVE = 250         # 25% for DCA reserve
+EMERGENCY_BUFFER = 100    # 10% emergency buffer
+FEE_BUFFER = 50           # 5% fee buffer
 
 # --- Risk Limits ---
-MAX_POSITION_PCT = 0.50       # 50% of capital per pair (10x leverage)
-MAX_OPEN_ORDERS = 10
+MAX_POSITION_PCT = 0.80       # 80% of capital per pair (10x leverage)
+MAX_OPEN_ORDERS = 40          # 4 pairs × 10 orders each
 DAILY_LOSS_LIMIT_PCT = 0.03   # 3% daily loss limit
 KILL_SWITCH_DRAWDOWN = 0.10   # 10% total drawdown kills trading
+STOP_LOSS_PCT = 0.005         # 0.5% stop loss per position (on notional)
 
 # --- Technical Analysis ---
 RSI_PERIOD = 14

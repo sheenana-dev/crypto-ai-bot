@@ -44,16 +44,16 @@ class RiskManager:
                 logger.warning(f"Max open orders ({settings.MAX_OPEN_ORDERS}) reached, skipping remaining signals")
                 break
 
-            # Check position size limit
-            signal_value = signal.price * signal.amount
-            max_position = self.starting_capital * settings.MAX_POSITION_PCT
-            pair_exposure = self._get_pair_exposure(signal.pair)
+            # Check position size limit (margin used by this order)
+            signal_margin = signal.price * signal.amount / settings.LEVERAGE
+            max_margin = self.starting_capital * settings.MAX_POSITION_PCT
+            pair_margin = self._get_pair_exposure(signal.pair) / settings.LEVERAGE
 
             if signal.side == OrderSide.BUY:
-                if pair_exposure + signal_value > max_position:
+                if pair_margin + signal_margin > max_margin:
                     logger.warning(
-                        f"Position limit: {signal.pair} exposure {pair_exposure:.2f} + "
-                        f"{signal_value:.2f} > max {max_position:.2f}, skipping"
+                        f"Position limit: {signal.pair} margin {pair_margin:.2f} + "
+                        f"{signal_margin:.2f} > max {max_margin:.2f}, skipping"
                     )
                     continue
 
