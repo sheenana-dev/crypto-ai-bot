@@ -289,6 +289,32 @@ def cmd_restart():
         send_telegram(f"❌ Restart failed: {e}")
 
 
+def cmd_kill():
+    """Kill the trading bot WITHOUT restarting it."""
+    try:
+        is_running, pid = is_bot_running()
+
+        if is_running:
+            subprocess.run(["kill", "-9", str(pid)])
+            time.sleep(2)
+
+            # Verify bot is dead
+            is_still_running, _ = is_bot_running()
+            if not is_still_running:
+                send_telegram(
+                    f"🛑 <b>Bot Killed</b> (PID {pid})\n\n"
+                    f"✅ Telegram is still alive!\n"
+                    f"Use /restart to bring the bot back."
+                )
+            else:
+                send_telegram(f"⚠️ Kill signal sent but bot still running. Retry or check manually.")
+        else:
+            send_telegram("Bot is already stopped")
+    except Exception as e:
+        logger.error(f"Kill command error: {e}")
+        send_telegram(f"❌ Kill failed: {e}")
+
+
 def cmd_logs():
     """Show last 20 lines of bot log."""
     try:
@@ -320,6 +346,7 @@ def cmd_help():
         "/pnl  -  Profit &amp; loss breakdown\n"
         "/positions  -  Detailed position info\n"
         "/close_all  -  🚨 Emergency: close all positions\n"
+        "/kill  -  🛑 Kill bot (keeps Telegram alive)\n"
         "/restart  -  Restart the trading bot\n"
         "/logs  -  Show recent bot logs\n"
         "/help  -  This message\n\n"
@@ -341,6 +368,7 @@ class TelegramListener:
             "/pnl": cmd_pnl,
             "/positions": cmd_positions,
             "/close_all": cmd_close_all,
+            "/kill": cmd_kill,
             "/restart": cmd_restart,
             "/logs": cmd_logs,
             "/help": cmd_help,
