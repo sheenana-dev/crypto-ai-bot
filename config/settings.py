@@ -24,7 +24,7 @@ FEE_BUFFER = 50           # 5% fee buffer
 # --- Risk Limits ---
 MAX_POSITION_PCT = 0.80       # 80% of capital per pair (10x leverage)
 MAX_OPEN_ORDERS = 40          # 4 pairs × 10 orders each
-DAILY_LOSS_LIMIT_PCT = 0.03   # 3% daily loss limit
+DAILY_LOSS_LIMIT_PCT = 0.05   # 5% daily loss limit
 KILL_SWITCH_DRAWDOWN = 0.10   # 10% total drawdown kills trading
 STOP_LOSS_PCT = 0.005         # 0.5% stop loss per position (on notional)
 

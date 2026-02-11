@@ -73,25 +73,18 @@ class RiskManager:
         return False
 
     def _get_daily_realized_pnl(self) -> float:
-        """Get today's realized P&L from the database."""
-        try:
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT COALESCE(SUM(
-                    CASE WHEN side = 'SELL' THEN price * filled - fee
-                         WHEN side = 'BUY' THEN -(price * filled + fee)
-                    END
-                ), 0) as daily_pnl
-                FROM trades
-                WHERE status = 'FILLED'
-                AND date(timestamp) = date('now')
-            """)
-            row = cursor.fetchone()
-            conn.close()
-            return float(row["daily_pnl"])
-        except Exception:
-            return 0.0
+        """Get today's realized P&L from exchange balance (source of truth).
+
+        FIXED: The old database calculation was broken — it treated all buys as "losses"
+        and all sells as "gains", even for open positions. This incorrectly blocked trading
+        when the bot had more long positions than shorts.
+
+        Exchange balance is the only reliable source for true realized P&L.
+        It accounts for fees, funding, and properly matches buys with sells.
+        """
+        # P&L = Starting capital - Current balance (negative if loss, positive if gain)
+        daily_pnl = self.starting_capital - self.current_balance
+        return -daily_pnl  # Negate so losses are negative, gains are positive
 
     def _get_open_order_count(self) -> int:
         """Get count of currently open orders from the database."""

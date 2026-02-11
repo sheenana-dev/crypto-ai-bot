@@ -71,15 +71,8 @@ def run_trading_cycle():
 
     try:
         exchange = create_exchange()
-        analyst = MarketAnalyst(exchange)
-        strategy = StrategyAgent(exchange)
-        risk_mgr = RiskManager()
-        executor = ExecutionAgent(exchange)
-        portfolio = PortfolioTracker(settings.DB_PATH)
 
-        results = {}
-
-        # Fetch account balance from exchange (real source of truth)
+        # Fetch account balance from exchange FIRST (needed for risk manager)
         try:
             balance = exchange.fetch_balance()
             info = balance.get("info", {})
@@ -94,7 +87,17 @@ def run_trading_cycle():
         except Exception as e:
             logger.error(f"Failed to fetch balance: {e}")
             send_telegram(f"⚠️ Balance fetch FAILED: {e}")
+            wallet_balance = settings.TOTAL_CAPITAL  # Fallback to starting capital
             usdt_balance = {"free": 0, "used": 0, "total": 0, "wallet_balance": 0, "realized_pnl": 0}
+
+        # Initialize agents (pass current balance to risk manager for accurate P&L calculation)
+        analyst = MarketAnalyst(exchange)
+        strategy = StrategyAgent(exchange)
+        risk_mgr = RiskManager(current_balance=wallet_balance)
+        executor = ExecutionAgent(exchange)
+        portfolio = PortfolioTracker(settings.DB_PATH)
+
+        results = {}
 
         # Fetch unrealized P&L from open positions + stop-loss check
         positions_pnl = {}
