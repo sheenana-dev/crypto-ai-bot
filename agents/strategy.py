@@ -89,8 +89,9 @@ class StrategyAgent:
                 # Normal ranging market (ADX 23-25)
                 spacing_multiplier = 1.0
         elif regime in [MarketRegime.TRENDING_UP, MarketRegime.TRENDING_DOWN]:
-            # Trending market — widen grids for safety (less exposure risk)
-            spacing_multiplier = 1.2
+            # Trending market — DOUBLE spacing to avoid getting run over by fast moves
+            # Prevents position accumulation when price moves 1%+ in one direction
+            spacing_multiplier = 2.0
         else:
             # Default
             spacing_multiplier = 1.0
