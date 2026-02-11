@@ -10,7 +10,7 @@
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Literal
+from typing import List, Optional
 
 import ccxt
 
@@ -20,7 +20,6 @@ from models.schemas import OrderSignal, OrderStatus, SignalType, TradeLog
 logger = logging.getLogger(__name__)
 
 MAX_RETRIES = 3
-LIQUIDITY_SAFETY_MULTIPLIER = 2.0  # Require 2x our order size in liquidity for limit orders
 
 
 class ExecutionAgent:
@@ -42,70 +41,15 @@ class ExecutionAgent:
         logger.info(f"Executed {len(trades)}/{len(signals)} orders")
         return trades
 
-    def _analyze_order_book_depth(
-        self, pair: str, side: str, price: float, amount: float
-    ) -> Literal["limit", "market"]:
-        """
-        Analyze order book liquidity to decide between limit vs market order.
-
-        Returns:
-            "limit" if liquidity is deep enough for GTX limit order
-            "market" if liquidity is thin and we should use market to guarantee fill
-        """
-        try:
-            # Fetch order book (top 20 levels should be enough)
-            order_book = self.exchange.fetch_order_book(pair, limit=20)
-
-            # For buy orders, check ask side liquidity
-            # For sell orders, check bid side liquidity
-            levels = order_book["asks"] if side.lower() == "buy" else order_book["bids"]
-
-            if not levels:
-                logger.warning(f"{pair} order book empty on {side} side — defaulting to market")
-                return "market"
-
-            # Calculate total liquidity at our target price level
-            # For limit orders, we need liquidity AT or BETTER than our price
-            total_liquidity = 0.0
-            for level_price, level_amount in levels:
-                if side.lower() == "buy" and level_price <= price:
-                    # Buy order: count asks at or below our price
-                    total_liquidity += level_amount
-                elif side.lower() == "sell" and level_price >= price:
-                    # Sell order: count bids at or above our price
-                    total_liquidity += level_amount
-
-            # Convert to notional (in quote currency, e.g., USDT)
-            liquidity_notional = total_liquidity * price
-            order_notional = amount * price
-
-            # Check if liquidity is sufficient (2x safety margin)
-            required_liquidity = order_notional * LIQUIDITY_SAFETY_MULTIPLIER
-
-            if liquidity_notional >= required_liquidity:
-                logger.debug(
-                    f"{pair} depth OK: ${liquidity_notional:.0f} available "
-                    f"(need ${required_liquidity:.0f}) → LIMIT"
-                )
-                return "limit"
-            else:
-                logger.info(
-                    f"{pair} THIN LIQUIDITY: ${liquidity_notional:.0f} available "
-                    f"(need ${required_liquidity:.0f}) → MARKET to guarantee fill"
-                )
-                return "market"
-
-        except Exception as e:
-            logger.warning(f"Order book fetch failed for {pair}: {e} — defaulting to market")
-            return "market"
-
     def _place_order(self, signal: OrderSignal) -> Optional[TradeLog]:
         """
-        Place a single order with smart execution:
-        - DCA/TP: always market (instant fill needed)
-        - Grid: analyze order book depth first
-          - Deep liquidity → GTX limit (0.02% maker fee)
-          - Thin liquidity → market (0.05% taker fee but guaranteed fill)
+        Place an order on the exchange.
+
+        - Grid orders: GTX limit orders (post-only, 0.02% maker fee)
+        - DCA/TP: market orders (instant fill needed, 0.05% taker fee)
+
+        GTX (Good-Til-Crossing) orders are rejected if they would immediately match.
+        This is fine - missing a fill is better than paying taker fees + spread.
         """
         # Binance Futures minimum notional is $100
         notional = signal.price * signal.amount
@@ -115,20 +59,9 @@ class ExecutionAgent:
 
         self._ensure_leverage(signal.pair)
 
-        # DCA/TP always use market for instant fills
+        # DCA/TP use market for instant fills, Grid uses GTX limit for maker fees
         is_dca = signal.signal_type in (SignalType.DCA_BUY, SignalType.DCA_TAKE_PROFIT)
-
-        # For grid orders, analyze liquidity to decide limit vs market
-        if is_dca:
-            use_market = True
-            execution_reason = "DCA/TP"
-        else:
-            # Grid order — check order book depth
-            depth_decision = self._analyze_order_book_depth(
-                signal.pair, signal.side.value, signal.price, signal.amount
-            )
-            use_market = (depth_decision == "market")
-            execution_reason = f"grid depth={depth_decision}"
+        use_market = is_dca
 
         for attempt in range(1, MAX_RETRIES + 1):
             try:
@@ -168,7 +101,7 @@ class ExecutionAgent:
                 order_type = "MARKET" if use_market else "LIMIT GTX"
                 logger.info(
                     f"Order placed: {order_type} {signal.side.value} {signal.amount} {signal.pair} "
-                    f"@ {fill_price} ({execution_reason}) → id={trade.order_id}"
+                    f"@ {fill_price} → id={trade.order_id}"
                 )
                 return trade
 
