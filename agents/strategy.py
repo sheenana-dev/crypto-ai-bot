@@ -47,12 +47,19 @@ class StrategyAgent:
         # If not crashing, close any active DCA by placing take-profit if we have a position
         dca_tp = self._dca_take_profit_if_recovered(market_state)
 
+        # REGIME-AWARE TRADING PAUSE: Only trade grid in RANGING markets
+        # In TRENDING markets, grid orders don't fill (0% fill rate) and waste API calls
+        # Better to pause and wait for ranging conditions to return
         if regime == MarketRegime.RANGING:
             return dca_tp + self._grid_signals(market_state, bias=0, regime=regime)
-        elif regime == MarketRegime.TRENDING_UP:
-            return dca_tp + self._grid_signals(market_state, bias=1, regime=regime)
-        elif regime == MarketRegime.TRENDING_DOWN:
-            return dca_tp + self._grid_signals(market_state, bias=-1, regime=regime)
+        elif regime in [MarketRegime.TRENDING_UP, MarketRegime.TRENDING_DOWN]:
+            # TRENDING market detected — PAUSE grid trading to avoid wasted orders
+            adx = market_state.indicators.adx
+            logger.info(
+                f"{pair} GRID PAUSED: {regime.value} market (ADX={adx:.1f}) — "
+                f"waiting for RANGING conditions to resume trading"
+            )
+            return dca_tp  # Only return DCA TP orders, no new grid orders
 
         return dca_tp
 
