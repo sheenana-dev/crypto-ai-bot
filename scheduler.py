@@ -45,7 +45,7 @@ kill_switch_active = False
 
 # Track last grid center price per pair — skip cancel/replace if price hasn't moved enough
 last_grid_center = {}
-GRID_REFRESH_THRESHOLD = 0.0005  # Only refresh grid if price moved >0.05% from center
+GRID_REFRESH_THRESHOLD = 0.001  # Only refresh grid if price moved >0.1% from center
 
 
 def create_exchange() -> ccxt.Exchange:
