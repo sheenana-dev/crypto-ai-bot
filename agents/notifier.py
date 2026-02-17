@@ -77,9 +77,14 @@ def format_cycle_report(results: dict, balance: dict = None) -> str:
 
         emoji = {"RANGING": "↔️", "TRENDING_UP": "📈", "TRENDING_DOWN": "📉", "CRASH": "🚨"}.get(regime, "❓")
 
-        lines.append(f"<b>{pair}</b> {emoji} {regime}")
-        lines.append(f"  Price: <code>${price:,.2f}</code> | RSI: <code>{rsi:.1f}</code>")
-        lines.append(f"  Orders placed: {executed}/{generated} | Open: {open_orders}")
+        regime_flip = data.get("regime_flip", False)
+        grid_kept = data.get("grid_kept", False)
+        adx = data.get("adx", 0)
+        tag = " [FLIP]" if regime_flip else (" [HELD]" if grid_kept else "")
+        lines.append(f"<b>{pair}</b> {emoji} {regime}{tag}")
+        lines.append(f"  Price: <code>${price:,.2f}</code> | RSI: <code>{rsi:.1f}</code> | ADX: <code>{adx:.1f}</code>")
+        if not grid_kept:
+            lines.append(f"  Orders placed: {executed}/{generated} | Open: {open_orders}")
 
         # Position info
         pos_side = data.get("position_side", "")

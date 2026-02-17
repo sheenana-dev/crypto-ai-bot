@@ -20,6 +20,7 @@ class Indicators(BaseModel):
     bb_lower: float
     adx: float
     price_change_24h_pct: float
+    volume_ratio: float = 1.0  # fast(5) / slow(20) volume MA — >1.5 = spike, <0.7 = dead
 
 
 class MarketState(BaseModel):
@@ -28,6 +29,7 @@ class MarketState(BaseModel):
     volume_24h: float
     indicators: Indicators
     regime: MarketRegime
+    regime_confidence: float = 1.0  # 0.0-1.0 — how many indicators agree on the regime
     timestamp: datetime
 
 

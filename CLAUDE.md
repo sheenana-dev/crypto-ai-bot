@@ -30,6 +30,7 @@ Portfolio tracks positions. Optimizer tunes parameters. Telegram for alerts.
 - Suggest performance optimizations or architectural improvements when you notice repeated patterns or bottlenecks
 
 ## Critical Rules
+- **Think critically before answering** — do NOT just agree with whatever I say. Challenge my assumptions, point out flaws in my reasoning, and give your honest technical opinion even if it contradicts me. You are the technical expert here. If I'm wrong, tell me WHY I'm wrong with data/math. Sycophantic agreement costs real money in trading.
 - Decimal for all price/quantity — never float
 - All orders through risk_manager.py — no bypass
 - No API keys in code — use config/

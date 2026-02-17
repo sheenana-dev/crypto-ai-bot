@@ -10,7 +10,7 @@
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import ccxt
 
@@ -134,7 +134,12 @@ class ExecutionAgent:
             logger.warning(f"Failed to set leverage for {pair}: {e}")
 
     def cancel_all_open_orders(self, pair: str) -> int:
-        """Cancel all open orders for a pair. Returns count cancelled."""
+        """Cancel all open limit orders for a pair. Returns count cancelled.
+
+        Note: Emergency stops are algo/conditional orders on Binance's Algo API.
+        They do NOT appear in fetch_open_orders, so they're inherently safe from
+        cancellation here. Managed separately by scheduler.manage_emergency_stops().
+        """
         try:
             open_orders = self.exchange.fetch_open_orders(pair)
             if not open_orders:
@@ -151,6 +156,92 @@ class ExecutionAgent:
         except Exception as e:
             logger.warning(f"Failed to fetch open orders for {pair}: {e}")
             return 0
+
+    def selective_refresh(self, pair: str, new_signals: List[OrderSignal],
+                          spacing_pct: float) -> Tuple[int, int, List[TradeLog]]:
+        """Selectively cancel/replace grid orders. Only cancel orders outside the new grid.
+
+        Compares existing open limit orders against new signals by (side, price).
+        Orders within half-spacing tolerance of a new signal are KEPT (preserving
+        near-filling orders). Unmatched orders are cancelled, unmatched signals are placed.
+
+        Returns (kept_count, cancelled_count, newly_placed_trades).
+        """
+        try:
+            existing = self.exchange.fetch_open_orders(pair)
+        except Exception as e:
+            logger.warning(f"Failed to fetch open orders for selective refresh on {pair}: {e}")
+            # Fallback: place all signals (same as fresh grid)
+            return 0, 0, self.execute_orders(new_signals)
+
+        # Filter to limit orders only (skip stop orders)
+        existing_limit = []
+        for o in existing:
+            order_type = (o.get("type") or "").lower()
+            raw_type = (o.get("info", {}).get("type") or "").upper()
+            if order_type == "limit" and raw_type not in ("STOP_MARKET", "STOP", "STOP_LIMIT"):
+                existing_limit.append(o)
+
+        if not existing_limit:
+            # No existing orders — just place everything
+            trades = self.execute_orders(new_signals)
+            return 0, 0, trades
+
+        # Separate grid signals from DCA/other signals
+        grid_signals = [s for s in new_signals
+                        if s.signal_type in (SignalType.GRID_BUY, SignalType.GRID_SELL)]
+        non_grid_signals = [s for s in new_signals
+                            if s.signal_type not in (SignalType.GRID_BUY, SignalType.GRID_SELL)]
+
+        # Match existing orders to new signals
+        signals_to_place = list(grid_signals)
+        orders_to_cancel = []
+        kept = 0
+        tolerance = spacing_pct * 0.5  # Half-spacing tolerance
+
+        for order in existing_limit:
+            order_side = order["side"]  # "buy" or "sell"
+            order_price = float(order.get("price", 0))
+
+            # Find best matching signal (closest price, same side)
+            best_match = None
+            best_diff = float('inf')
+            for signal in signals_to_place:
+                if signal.side.value.lower() != order_side:
+                    continue
+                price_diff = abs(order_price - signal.price) / max(order_price, 1)
+                if price_diff < tolerance and price_diff < best_diff:
+                    best_match = signal
+                    best_diff = price_diff
+
+            if best_match:
+                signals_to_place.remove(best_match)
+                kept += 1
+                logger.debug(
+                    f"Keeping {pair} {order_side} @ ${order_price:.4f} "
+                    f"(matches new signal @ ${best_match.price:.4f}, diff={best_diff*100:.3f}%)"
+                )
+            else:
+                orders_to_cancel.append(order)
+
+        # Cancel unmatched orders
+        for order in orders_to_cancel:
+            try:
+                self.exchange.cancel_order(order["id"], pair)
+                logger.info(
+                    f"Selective cancel: {pair} {order['side'].upper()} @ ${float(order.get('price', 0)):.4f}"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to cancel {order['id']}: {e}")
+
+        # Place remaining new grid signals + all non-grid signals (DCA etc)
+        trades = self.execute_orders(signals_to_place + non_grid_signals)
+
+        logger.info(
+            f"{pair} selective refresh: kept {kept}, cancelled {len(orders_to_cancel)}, "
+            f"placed {len(trades)} new"
+        )
+        return kept, len(orders_to_cancel), trades
 
     def cancel_stale_orders(self, pair: str, open_orders: List[dict], max_age_hours: int = 24) -> int:
         """Cancel orders older than max_age_hours. Returns count of cancelled orders."""

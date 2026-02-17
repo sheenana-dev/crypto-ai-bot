@@ -6,6 +6,11 @@ load_dotenv()
 exchange = ccxt.binanceusdm({
     'apiKey': os.getenv('BINANCE_API_KEY'),
     'secret': os.getenv('BINANCE_API_SECRET'),
+    'timeout': 30000,  # 30 second timeout
+    'options': {
+        'defaultType': 'future',
+        'recvWindow': 60000,
+    },
 })
 exchange.set_sandbox_mode(False)
 

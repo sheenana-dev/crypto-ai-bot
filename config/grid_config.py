@@ -1,31 +1,31 @@
 GRID_PARAMS = {
     "BTC/USDT:USDT": {
-        "num_grids": 10,
-        "grid_spacing_pct": 0.002,   # 0.2% tightened from 0.3% — more fills, less profit per trade
-        "order_size_usdt": 25,       # Best performer
-        "range_pct": 0.02,           # 2% total range
+        "num_grids": 6,               # 3 buy + 3 sell — concentrated near price (dynamic-style)
+        "grid_spacing_pct": 0.008,     # 0.8% base — $5.90/RT with adaptive ×1.5
+        "order_size_usdt": 25,
+        "range_pct": 0.048,            # 4.8% total range (6 grids × 0.8%)
     },
     "ETH/USDT:USDT": {
-        "num_grids": 10,
-        "grid_spacing_pct": 0.003,   # 0.3% tightened from 0.5% — need more fills
+        "num_grids": 6,
+        "grid_spacing_pct": 0.008,     # 0.8% base — 4.9% daily range supports wider spacing
         "order_size_usdt": 20,
-        "range_pct": 0.03,
+        "range_pct": 0.048,            # 4.8% total range
     },
     "SOL/USDT:USDT": {
-        "num_grids": 10,
-        "grid_spacing_pct": 0.003,   # 0.3% tightened from 0.5% — more volatile, should fill more
+        "num_grids": 6,
+        "grid_spacing_pct": 0.010,     # 1.0% base — more volatile (4%+ daily), needs wider
         "order_size_usdt": 20,
-        "range_pct": 0.03,
+        "range_pct": 0.06,             # 6% total range (6 grids × 1.0%)
     },
     "XRP/USDT:USDT": {
-        "num_grids": 10,
-        "grid_spacing_pct": 0.004,   # 0.4% tightened from 0.7% — balance fills vs profit
+        "num_grids": 6,
+        "grid_spacing_pct": 0.010,     # 1.0% base — most volatile (6.6% daily), widest spacing
         "order_size_usdt": 25,
-        "range_pct": 0.04,
+        "range_pct": 0.06,             # 6% total range
     },
     "DOGE/USDT:USDT": {
         "num_grids": 10,
-        "grid_spacing_pct": 0.008,   # 0.8% — widened from 0.5%, 10% WR was too tight
+        "grid_spacing_pct": 0.012,   # 1.2% — Phase 1: widened from 0.8% (weakest performer, needs widest spacing)
         "order_size_usdt": 15,       # Reduced from $20 — weakest performer (10% WR), limit exposure
         "range_pct": 0.08,
     },
